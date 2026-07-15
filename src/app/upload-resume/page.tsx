@@ -31,7 +31,7 @@ export default function UploadResumePage() {
         setUploadMessage(`Successfully uploaded: ${file.name}`);
         // Add a slight delay for the user to see the success message before navigating
         setTimeout(() => {
-          router.push("/setup-profile");
+          router.push("/setup-profile?mode=parsed");
         }, 1000);
       } else {
         setUploadMessage("Upload failed. Please try again.");
@@ -98,7 +98,10 @@ export default function UploadResumePage() {
                 )}
               </button>
 
-              <button className="w-[185px] h-[48px] rounded-full bg-[#F7FAFF] border-[1.5px] border-[#3038BD] text-[#3038BD] font-poppins text-[14px] font-medium flex items-center justify-center hover:bg-[#EEF2FF] transition-colors focus:outline-none">
+              <button 
+                onClick={() => router.push("/setup-profile?mode=manual")}
+                className="w-[185px] h-[48px] rounded-full bg-[#F7FAFF] border-[1.5px] border-[#3038BD] text-[#3038BD] font-poppins text-[14px] font-medium flex items-center justify-center hover:bg-[#EEF2FF] transition-colors focus:outline-none"
+              >
                 Create Manually
               </button>
             </div>
