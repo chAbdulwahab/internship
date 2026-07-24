@@ -1,11 +1,89 @@
 "use client";
 
+import { useState, useEffect, FormEvent, Suspense } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { SignupLayout } from "@/components/signup/SignupLayout";
+import { createClient } from "@/lib/supabase/client";
 
-export default function SignUpPage() {
+function SignUpFormContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [occupation, setOccupation] = useState<string>("freelancer");
+
+  useEffect(() => {
+    const urlOccupation = searchParams.get("occupation");
+    if (urlOccupation) {
+      setOccupation(urlOccupation);
+      if (typeof window !== "undefined") {
+        sessionStorage.setItem("selected_occupation", urlOccupation);
+      }
+    } else if (typeof window !== "undefined") {
+      const stored = sessionStorage.getItem("selected_occupation");
+      if (stored) {
+        setOccupation(stored);
+      }
+    }
+  }, [searchParams]);
+
+  const handleSubmit = async (e: FormEvent) => {
+    e.preventDefault();
+    setError(null);
+
+    if (!email || !password || !confirmPassword) {
+      setError("Please fill in all fields.");
+      return;
+    }
+
+    if (password !== confirmPassword) {
+      setError("Passwords do not match.");
+      return;
+    }
+
+    if (password.length < 8) {
+      setError("Password must contain at least 8 characters.");
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      const supabase = createClient();
+      const { error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: {
+            role: occupation,
+          },
+          emailRedirectTo: `${window.location.origin}/auth/callback`,
+        },
+      });
+
+      if (error) {
+        setError(error.message);
+        setLoading(false);
+        return;
+      }
+
+      // Store user email in sessionStorage for verify-otp page
+      if (typeof window !== "undefined") {
+        sessionStorage.setItem("signup_email", email);
+      }
+
+      // Navigate ONLY to /verify-otp after sign-up
+      router.push(`/verify-otp?email=${encodeURIComponent(email)}`);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "An unexpected error occurred.");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <SignupLayout>
@@ -15,7 +93,13 @@ export default function SignUpPage() {
           Create Account
         </h1>
 
-        <form className="flex flex-col gap-[27px]">
+        <form onSubmit={handleSubmit} className="flex flex-col gap-[27px]">
+          {error && (
+            <div className="w-[413px] bg-[#FDE7E7] border border-[#F25C5C] text-[#EA3B3B] px-[16px] py-[10px] rounded-[10px] text-[13px] font-poppins font-medium">
+              {error}
+            </div>
+          )}
+
           {/* Email Address */}
           <div className="flex flex-col gap-[7px]">
             <label className="font-poppins text-[16px] font-semibold text-[#050A62] ml-[7px]">
@@ -23,6 +107,10 @@ export default function SignUpPage() {
             </label>
             <input
               type="email"
+              required
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="name@domain.com"
               className="w-[413px] h-[53px] rounded-[13px] bg-[#F3F7FF] border-[1.33px] border-[#D2DCFF] px-[20px] font-poppins text-[16px] text-[#050A62] focus:outline-none focus:border-[#3038BD] transition-colors"
             />
           </div>
@@ -34,6 +122,10 @@ export default function SignUpPage() {
             </label>
             <input
               type="password"
+              required
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="••••••••"
               className="w-[413px] h-[53px] rounded-[13px] bg-[#F3F7FF] border-[1.33px] border-[#D2DCFF] px-[20px] font-poppins text-[16px] text-[#050A62] focus:outline-none focus:border-[#3038BD] transition-colors"
             />
           </div>
@@ -45,6 +137,10 @@ export default function SignUpPage() {
             </label>
             <input
               type="password"
+              required
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+              placeholder="••••••••"
               className="w-[413px] h-[53px] rounded-[13px] bg-[#F3F7FF] border-[1.33px] border-[#D2DCFF] px-[20px] font-poppins text-[16px] text-[#050A62] focus:outline-none focus:border-[#3038BD] transition-colors"
             />
             {/* Helper Text */}
@@ -56,11 +152,11 @@ export default function SignUpPage() {
           {/* Sign Up Button */}
           <div className="flex justify-center mt-[13px]">
             <button
-              type="button"
-              onClick={() => router.push('/verify-otp')}
-              className="w-[132px] h-[37.5px] rounded-full bg-[#3038BD] text-[#FFFFFF] font-poppins text-[12px] font-medium leading-none hover:bg-[#252b99] active:opacity-90 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 focus-visible:ring-offset-1 border-none"
+              type="submit"
+              disabled={loading}
+              className="w-[132px] h-[37.5px] rounded-full bg-[#3038BD] text-[#FFFFFF] font-poppins text-[12px] font-medium leading-none hover:bg-[#252b99] active:opacity-90 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 focus-visible:ring-offset-1 border-none disabled:opacity-50 cursor-pointer"
             >
-              Sign Up
+              {loading ? "Signing Up..." : "Sign Up"}
             </button>
           </div>
         </form>
@@ -76,5 +172,19 @@ export default function SignUpPage() {
         </div>
       </div>
     </SignupLayout>
+  );
+}
+
+export default function SignUpPage() {
+  return (
+    <Suspense fallback={
+      <SignupLayout>
+        <div className="w-full h-full flex items-center justify-center font-poppins text-[#050A62]">
+          Loading...
+        </div>
+      </SignupLayout>
+    }>
+      <SignUpFormContent />
+    </Suspense>
   );
 }

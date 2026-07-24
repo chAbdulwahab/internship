@@ -2,21 +2,58 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState, useEffect } from "react";
+import { useState, useEffect, FormEvent } from "react";
 import { SignupLayout } from "@/components/signup/SignupLayout";
+import { createClient } from "@/lib/supabase/client";
 
 export default function SignInPage() {
   const router = useRouter();
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [isVerified, setIsVerified] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     if (isVerified) {
       const timer = setTimeout(() => {
         router.push("/upload-resume"); // Routing to the next step
-      }, 3000); // 3 seconds
+      }, 2000);
       return () => clearTimeout(timer);
     }
   }, [isVerified, router]);
+
+  const handleSubmit = async (e: FormEvent) => {
+    e.preventDefault();
+    setError(null);
+
+    if (!email || !password) {
+      setError("Please enter both email and password.");
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      const supabase = createClient();
+      const { error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+
+      if (error) {
+        setError(error.message);
+        setLoading(false);
+        return;
+      }
+
+      setIsVerified(true);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "An unexpected error occurred.");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   if (isVerified) {
     return (
@@ -51,7 +88,13 @@ export default function SignInPage() {
             Sign In
           </h1>
 
-          <form className="flex flex-col gap-[27px]">
+          <form onSubmit={handleSubmit} className="flex flex-col gap-[27px]">
+            {error && (
+              <div className="w-[413px] bg-[#FDE7E7] border border-[#F25C5C] text-[#EA3B3B] px-[16px] py-[10px] rounded-[10px] text-[13px] font-poppins font-medium">
+                {error}
+              </div>
+            )}
+
             {/* Email Address */}
             <div className="flex flex-col gap-[7px]">
               <label className="font-poppins text-[16px] font-semibold text-[#050A62] ml-[7px]">
@@ -59,6 +102,10 @@ export default function SignInPage() {
               </label>
               <input
                 type="email"
+                required
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="name@domain.com"
                 className="w-[413px] h-[53px] rounded-[13px] bg-[#F3F7FF] border-[1.33px] border-[#D2DCFF] px-[20px] font-poppins text-[16px] text-[#050A62] focus:outline-none focus:border-[#3038BD] transition-colors"
               />
             </div>
@@ -70,6 +117,10 @@ export default function SignInPage() {
               </label>
               <input
                 type="password"
+                required
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="••••••••"
                 className="w-[413px] h-[53px] rounded-[13px] bg-[#F3F7FF] border-[1.33px] border-[#D2DCFF] px-[20px] font-poppins text-[16px] text-[#050A62] focus:outline-none focus:border-[#3038BD] transition-colors"
               />
               <div className="flex justify-end w-[413px] mt-[4px]">
@@ -82,11 +133,11 @@ export default function SignInPage() {
             {/* Sign In Button */}
             <div className="flex justify-center mt-[13px]">
               <button
-                type="button"
-                onClick={() => setIsVerified(true)}
-                className="w-[132px] h-[37.5px] rounded-full bg-[#3038BD] text-[#FFFFFF] font-poppins text-[12px] font-medium leading-none hover:bg-[#252b99] active:opacity-90 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 focus-visible:ring-offset-1 border-none"
+                type="submit"
+                disabled={loading}
+                className="w-[132px] h-[37.5px] rounded-full bg-[#3038BD] text-[#FFFFFF] font-poppins text-[12px] font-medium leading-none hover:bg-[#252b99] active:opacity-90 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 focus-visible:ring-offset-1 border-none disabled:opacity-50 cursor-pointer"
               >
-                Sign In
+                {loading ? "Signing In..." : "Sign In"}
               </button>
             </div>
           </form>
@@ -95,7 +146,7 @@ export default function SignInPage() {
           <div className="absolute top-[679px] left-0 right-0 flex justify-center">
             <p className="font-poppins text-[17px] font-normal text-[#070E66] text-center">
               Don't have an account?{" "}
-              <Link href="/" className="text-[#3038BD] hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 rounded-sm">
+              <Link href="/sign-up" className="text-[#3038BD] hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 rounded-sm">
                 Sign Up
               </Link>
             </p>

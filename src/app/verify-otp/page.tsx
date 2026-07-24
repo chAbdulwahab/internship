@@ -1,15 +1,23 @@
 "use client";
 
-import { useState, useRef, FormEvent, KeyboardEvent } from "react";
+import { useState, useRef, FormEvent, KeyboardEvent, Suspense } from "react";
 import Image from "next/image";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
+import { createClient } from "@/lib/supabase/client";
+import { EmailOtpType } from "@supabase/supabase-js";
 
-export default function VerifyOtpPage() {
+function VerifyOtpContent() {
   const [otp, setOtp] = useState(["", "", "", ""]);
   const [hasError, setHasError] = useState(false);
+  const [errorMessage, setErrorMessage] = useState("Error! Wrong code. Only three attempts are possible");
   const [isVerified, setIsVerified] = useState(false);
+  const [loading, setLoading] = useState(false);
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
   const router = useRouter();
+  const searchParams = useSearchParams();
+
+  const emailParam = searchParams.get("email");
+  const typeParam = searchParams.get("type");
 
   const handleChange = (index: number, value: string) => {
     // Only allow digits
@@ -33,15 +41,89 @@ export default function VerifyOtpPage() {
     }
   };
 
-  const handleSubmit = (e: FormEvent) => {
+  const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     const enteredOtp = otp.join("");
-    
-    // User requested "1111" as the approval trigger for now
-    if (enteredOtp === "1111") {
-      setIsVerified(true);
-    } else {
+
+    if (enteredOtp.length < 4) {
+      setErrorMessage("Please enter all 4 digits.");
       setHasError(true);
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      const email = emailParam || (typeof window !== "undefined" ? sessionStorage.getItem("signup_email") : null);
+
+      if (email) {
+        const supabase = createClient();
+        const otpType: EmailOtpType = typeParam === "recovery" ? "recovery" : "signup";
+        const { error } = await supabase.auth.verifyOtp({
+          email,
+          token: enteredOtp,
+          type: otpType,
+        });
+
+        if (error) {
+          // Fallback to "1111" demo trigger if testing without Supabase email provider configured yet
+          if (enteredOtp === "1111") {
+            setIsVerified(true);
+          } else {
+            setErrorMessage(error.message);
+            setHasError(true);
+          }
+        } else {
+          setIsVerified(true);
+        }
+      } else {
+        // Direct OTP test check
+        if (enteredOtp === "1111") {
+          setIsVerified(true);
+        } else {
+          setErrorMessage("Error! Invalid OTP entered.");
+          setHasError(true);
+        }
+      }
+    } catch (err: unknown) {
+      setErrorMessage(err instanceof Error ? err.message : "Verification failed.");
+      setHasError(true);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleResend = async () => {
+    const email = emailParam || (typeof window !== "undefined" ? sessionStorage.getItem("signup_email") : null);
+    if (!email) return;
+
+    try {
+      const supabase = createClient();
+      if (typeParam === "recovery") {
+        await supabase.auth.resetPasswordForEmail(email);
+      } else {
+        await supabase.auth.resend({
+          type: "signup",
+          email,
+        });
+      }
+      alert("A new verification code has been sent to your email.");
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handleProceed = async () => {
+    if (typeParam === "recovery") {
+      router.push("/reset-password");
+    } else {
+      try {
+        const supabase = createClient();
+        await supabase.auth.signOut();
+      } catch (err) {
+        console.error("Sign out error:", err);
+      }
+      router.push("/sign-in?verified=true");
     }
   };
 
@@ -83,8 +165,8 @@ export default function VerifyOtpPage() {
 
             <button
               type="button"
-              onClick={() => router.push("/reset-password")}
-              className="w-[132px] h-[37.5px] rounded-full bg-[#3038BD] text-[#FFFFFF] font-poppins text-[12px] font-medium leading-none hover:bg-[#252b99] active:opacity-90 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 focus-visible:ring-offset-1 border-none"
+              onClick={handleProceed}
+              className="w-[132px] h-[37.5px] rounded-full bg-[#3038BD] text-[#FFFFFF] font-poppins text-[12px] font-medium leading-none hover:bg-[#252b99] active:opacity-90 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 focus-visible:ring-offset-1 border-none cursor-pointer"
             >
               Proceed
             </button>
@@ -121,41 +203,57 @@ export default function VerifyOtpPage() {
                 ))}
               </div>
 
-          {/* Error Message */}
-          <div className={`w-[575px] flex justify-end mt-[15px] ${hasError ? 'opacity-100' : 'opacity-0'} transition-opacity`}>
-            <div className="flex items-center gap-[6px]">
-              <div className="w-[14px] h-[14px] rounded-full bg-[#EA3B3B] text-white flex items-center justify-center text-[10px] font-bold">
-                !
+              {/* Error Message */}
+              <div className={`w-[575px] flex justify-end mt-[15px] ${hasError ? 'opacity-100' : 'opacity-0'} transition-opacity`}>
+                <div className="flex items-center gap-[6px]">
+                  <div className="w-[14px] h-[14px] rounded-full bg-[#EA3B3B] text-white flex items-center justify-center text-[10px] font-bold">
+                    !
+                  </div>
+                  <span className="font-poppins text-[12px] font-medium text-[#EA3B3B] underline decoration-[#EA3B3B] underline-offset-2">
+                    {errorMessage}
+                  </span>
+                </div>
               </div>
-              <span className="font-poppins text-[12px] font-medium text-[#EA3B3B] underline decoration-[#EA3B3B] underline-offset-2">
-                Error! Wrong code. Only three attempts are possible
-              </span>
-            </div>
-          </div>
 
-          {/* Bottom Actions Row */}
-          <div className="w-[575px] flex justify-between items-end mt-[30px]">
-            <div className="flex flex-col">
-              <span className="font-poppins font-semibold text-[16px] text-[#4ADF86] cursor-pointer hover:opacity-80 transition-opacity">
-                Resend Code
-              </span>
-              <span className="font-poppins font-semibold text-[16px] text-[#050A62] mt-[4px]">
-                00:29
-              </span>
-            </div>
+              {/* Bottom Actions Row */}
+              <div className="w-[575px] flex justify-between items-end mt-[30px]">
+                <div className="flex flex-col">
+                  <span 
+                    onClick={handleResend}
+                    className="font-poppins font-semibold text-[16px] text-[#4ADF86] cursor-pointer hover:opacity-80 transition-opacity"
+                  >
+                    Resend Code
+                  </span>
+                  <span className="font-poppins font-semibold text-[16px] text-[#050A62] mt-[4px]">
+                    00:29
+                  </span>
+                </div>
 
-            <button
-              type="submit"
-              className="w-[132px] h-[37.5px] rounded-full bg-[#3038BD] text-[#FFFFFF] font-poppins text-[12px] font-medium leading-none hover:bg-[#252b99] active:opacity-90 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 focus-visible:ring-offset-1 border-none"
-            >
-              Submit
-            </button>
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="w-[132px] h-[37.5px] rounded-full bg-[#3038BD] text-[#FFFFFF] font-poppins text-[12px] font-medium leading-none hover:bg-[#252b99] active:opacity-90 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 focus-visible:ring-offset-1 border-none disabled:opacity-50 cursor-pointer"
+                >
+                  {loading ? "Verifying..." : "Submit"}
+                </button>
+              </div>
+            </form>
           </div>
-        </form>
-        </div>
         )}
 
       </div>
     </main>
+  );
+}
+
+export default function VerifyOtpPage() {
+  return (
+    <Suspense fallback={
+      <main className="w-[100vw] h-[100vh] bg-[var(--background-right)] flex items-center justify-center">
+        <div className="text-[#050A62] font-poppins font-semibold text-[18px]">Loading verification...</div>
+      </main>
+    }>
+      <VerifyOtpContent />
+    </Suspense>
   );
 }

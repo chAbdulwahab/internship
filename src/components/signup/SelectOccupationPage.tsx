@@ -15,8 +15,12 @@ export function SelectOccupationPage() {
   const router = useRouter();
 
   const handleNext = () => {
+    if (!selectedOccupation) return;
     const slug = selectedOccupation.toLowerCase().replace(/ /g, "-");
-    router.push(`/sign-up?occupation=${slug}`);
+    if (typeof window !== "undefined") {
+      sessionStorage.setItem("selected_occupation", slug);
+    }
+    router.push(`/sign-up?occupation=${encodeURIComponent(slug)}`);
   };
 
   return (

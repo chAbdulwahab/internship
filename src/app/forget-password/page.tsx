@@ -1,10 +1,51 @@
 "use client";
 
+import { useState, FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { SignupLayout } from "@/components/signup/SignupLayout";
+import { createClient } from "@/lib/supabase/client";
 
 export default function ForgetPasswordPage() {
   const router = useRouter();
+  const [email, setEmail] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [message, setMessage] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const handleSubmit = async (e: FormEvent) => {
+    e.preventDefault();
+    setError(null);
+    setMessage(null);
+
+    if (!email) {
+      setError("Please enter your email address.");
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      const supabase = createClient();
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/auth/callback?next=/reset-password`,
+      });
+
+      if (error) {
+        setError(error.message);
+        setLoading(false);
+        return;
+      }
+
+      setMessage("Verification email / OTP sent! Please check your inbox.");
+      setTimeout(() => {
+        router.push(`/verify-otp?email=${encodeURIComponent(email)}&type=recovery`);
+      }, 1500);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "An unexpected error occurred.");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <SignupLayout leftImage="/assets/Forget-Password.png" showSocial={false}>
@@ -19,7 +60,19 @@ export default function ForgetPasswordPage() {
           Please enter your email address so we can send you verification code to reset your password
         </p>
 
-        <form className="flex flex-col gap-[27px]">
+        <form onSubmit={handleSubmit} className="flex flex-col gap-[27px]">
+          {error && (
+            <div className="w-[413px] bg-[#FDE7E7] border border-[#F25C5C] text-[#EA3B3B] px-[16px] py-[10px] rounded-[10px] text-[13px] font-poppins font-medium">
+              {error}
+            </div>
+          )}
+
+          {message && (
+            <div className="w-[413px] bg-[#E2F7EE] border border-[#4ADF86] text-[#050A62] px-[16px] py-[10px] rounded-[10px] text-[13px] font-poppins font-medium">
+              {message}
+            </div>
+          )}
+
           {/* Email Address */}
           <div className="flex flex-col gap-[7px]">
             <label className="font-poppins text-[13px] font-semibold text-[#050A62] ml-[7px]">
@@ -27,6 +80,10 @@ export default function ForgetPasswordPage() {
             </label>
             <input
               type="email"
+              required
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="name@domain.com"
               className="w-[413px] h-[53px] rounded-[13px] bg-[#F3F7FF] border-[1.33px] border-[#D2DCFF] px-[20px] font-poppins text-[16px] text-[#050A62] focus:outline-none focus:border-[#3038BD] transition-colors"
             />
           </div>
@@ -34,11 +91,11 @@ export default function ForgetPasswordPage() {
           {/* Reset Password Button */}
           <div className="absolute top-[480px] left-0 right-0 flex justify-center">
             <button
-              type="button"
-              onClick={() => router.push('/verify-otp')}
-              className="w-[170px] h-[37.5px] rounded-full bg-[#3038BD] text-[#FFFFFF] font-poppins text-[12px] font-medium leading-none hover:bg-[#252b99] active:opacity-90 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 focus-visible:ring-offset-1 border-none"
+              type="submit"
+              disabled={loading}
+              className="w-[170px] h-[37.5px] rounded-full bg-[#3038BD] text-[#FFFFFF] font-poppins text-[12px] font-medium leading-none hover:bg-[#252b99] active:opacity-90 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 focus-visible:ring-offset-1 border-none disabled:opacity-50 cursor-pointer"
             >
-              Reset Password
+              {loading ? "Sending..." : "Reset Password"}
             </button>
           </div>
         </form>

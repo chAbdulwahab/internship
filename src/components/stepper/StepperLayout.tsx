@@ -2,6 +2,7 @@
 
 import { ReactNode } from "react";
 import { useRouter } from "next/navigation";
+import { createClient } from "@/lib/supabase/client";
 
 interface StepperLayoutProps {
   children: ReactNode;
@@ -10,6 +11,16 @@ interface StepperLayoutProps {
 
 export function StepperLayout({ children, currentStep }: StepperLayoutProps) {
   const router = useRouter();
+
+  const handleLogout = async () => {
+    try {
+      const supabase = createClient();
+      await supabase.auth.signOut();
+    } catch (err) {
+      console.error("Logout error:", err);
+    }
+    router.push("/sign-in");
+  };
 
   const steps = [
     { number: 1, title: "Upload Resume" },
@@ -30,7 +41,7 @@ export function StepperLayout({ children, currentStep }: StepperLayoutProps) {
         {/* Left Back Arrow Button */}
         <button 
           onClick={() => router.back()}
-          className="w-[90px] h-full bg-[#18CD94] flex items-center justify-center shrink-0 hover:bg-[#15b381] transition-colors focus:outline-none"
+          className="w-[90px] h-full bg-[#18CD94] flex items-center justify-center shrink-0 hover:bg-[#15b381] transition-colors focus:outline-none cursor-pointer"
         >
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
             <path d="M19 12H5M5 12L12 19M5 12L12 5" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
@@ -64,8 +75,12 @@ export function StepperLayout({ children, currentStep }: StepperLayoutProps) {
 
         </div>
 
-        {/* Right Exit Button */}
-        <button className="w-[90px] h-full flex items-center justify-center shrink-0 hover:bg-gray-50 transition-colors focus:outline-none">
+        {/* Right Exit / Logout Button */}
+        <button 
+          onClick={handleLogout}
+          title="Logout"
+          className="w-[90px] h-full flex items-center justify-center shrink-0 hover:bg-gray-50 transition-colors focus:outline-none cursor-pointer"
+        >
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
             <path d="M17 16L21 12M21 12L17 8M21 12H9M13 16V17C13 18.6569 11.6569 20 10 20H6C4.34315 20 3 18.6569 3 17V7C3 5.34315 4.34315 4 6 4H10C11.6569 4 13 5.34315 13 7V8" stroke="#050A62" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
           </svg>
