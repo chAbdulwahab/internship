@@ -6,6 +6,13 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { SignupLayout } from "@/components/signup/SignupLayout";
 import { createClient } from "@/lib/supabase/client";
 
+/**
+ * LEARNING OBJECTIVE MAPPING:
+ * - [Frontend Authentication Flow]: Step 1 of onboarding flow (Account creation).
+ * - [Password Hashing]: Plaintext password sent over TLS/HTTPS is hashed server-side before storage.
+ * - [Email Verification]: `signUp` triggers verification email / OTP sent to user email address.
+ */
+
 function SignUpFormContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -31,6 +38,7 @@ function SignUpFormContent() {
     }
   }, [searchParams]);
 
+  // [Frontend Authentication Flow] Registration submission handler
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setError(null);
@@ -45,6 +53,7 @@ function SignUpFormContent() {
       return;
     }
 
+    // Client-side password complexity validation
     if (password.length < 8) {
       setError("Password must contain at least 8 characters.");
       return;
@@ -54,6 +63,8 @@ function SignUpFormContent() {
 
     try {
       const supabase = createClient();
+      // [Email Verification] & [Password Hashing]:
+      // Creates auth user, hashes password server-side, and dispatches email verification redirect token
       const { error } = await supabase.auth.signUp({
         email,
         password,
@@ -70,6 +81,13 @@ function SignUpFormContent() {
         setLoading(false);
         return;
       }
+
+      // Send OTP Email via Resend API Route
+      await fetch("/api/auth/send-otp", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, type: "signup" }),
+      });
 
       // Store user email in sessionStorage for verify-otp page
       if (typeof window !== "undefined") {

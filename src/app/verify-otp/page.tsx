@@ -6,6 +6,13 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { EmailOtpType } from "@supabase/supabase-js";
 
+/**
+ * LEARNING OBJECTIVE MAPPING:
+ * - [Email Verification]: Verification of 4-digit token sent during sign-up registration.
+ * - [Password Reset]: Verification of recovery OTP token sent during password reset flow.
+ * - [Frontend Authentication Flow]: Intermediate verification step routing user to sign-in or reset-password.
+ */
+
 function VerifyOtpContent() {
   const [otp, setOtp] = useState(["", "", "", ""]);
   const [hasError, setHasError] = useState(false);
@@ -41,6 +48,7 @@ function VerifyOtpContent() {
     }
   };
 
+  // [Frontend Authentication Flow] Verify OTP submission
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     const enteredOtp = otp.join("");
@@ -57,27 +65,35 @@ function VerifyOtpContent() {
       const email = emailParam || (typeof window !== "undefined" ? sessionStorage.getItem("signup_email") : null);
 
       if (email) {
-        const supabase = createClient();
-        const otpType: EmailOtpType = typeParam === "recovery" ? "recovery" : "signup";
-        const { error } = await supabase.auth.verifyOtp({
-          email,
-          token: enteredOtp,
-          type: otpType,
+        // Try verifying against custom Resend API route
+        const apiRes = await fetch("/api/auth/verify-otp", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email, otpCode: enteredOtp }),
         });
 
-        if (error) {
-          // Fallback to "1111" demo trigger if testing without Supabase email provider configured yet
-          if (enteredOtp === "1111") {
+        const apiData = await apiRes.json();
+
+        if (apiRes.ok && apiData.success) {
+          setIsVerified(true);
+        } else {
+          // Fallback to Supabase auth or "1111" demo code
+          const supabase = createClient();
+          const otpType: EmailOtpType = typeParam === "recovery" ? "recovery" : "signup";
+          const { error } = await supabase.auth.verifyOtp({
+            email,
+            token: enteredOtp,
+            type: otpType,
+          });
+
+          if (!error || enteredOtp === "1111") {
             setIsVerified(true);
           } else {
-            setErrorMessage(error.message);
+            setErrorMessage(apiData.error || error?.message || "Invalid OTP code.");
             setHasError(true);
           }
-        } else {
-          setIsVerified(true);
         }
       } else {
-        // Direct OTP test check
         if (enteredOtp === "1111") {
           setIsVerified(true);
         } else {
@@ -98,16 +114,17 @@ function VerifyOtpContent() {
     if (!email) return;
 
     try {
-      const supabase = createClient();
-      if (typeParam === "recovery") {
-        await supabase.auth.resetPasswordForEmail(email);
+      const res = await fetch("/api/auth/send-otp", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, type: typeParam === "recovery" ? "recovery" : "signup" }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        alert("A new 4-digit verification code has been sent to your email.");
       } else {
-        await supabase.auth.resend({
-          type: "signup",
-          email,
-        });
+        alert(data.error || "Failed to resend code.");
       }
-      alert("A new verification code has been sent to your email.");
     } catch (err) {
       console.error(err);
     }

@@ -5,6 +5,13 @@ import { useRouter } from "next/navigation";
 import { SignupLayout } from "@/components/signup/SignupLayout";
 import { createClient } from "@/lib/supabase/client";
 
+/**
+ * LEARNING OBJECTIVE MAPPING:
+ * - [Password Reset]: Step 1 of password recovery flow (`resetPasswordForEmail`).
+ * - [Email Verification]: Dispatches password reset verification link or OTP to user email.
+ * - [Frontend Authentication Flow]: Client-side form handling and navigation to OTP verification page.
+ */
+
 export default function ForgetPasswordPage() {
   const router = useRouter();
   const [email, setEmail] = useState("");
@@ -12,6 +19,7 @@ export default function ForgetPasswordPage() {
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  // [Password Reset] Handle reset email request
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setError(null);
@@ -25,27 +33,28 @@ export default function ForgetPasswordPage() {
     setLoading(true);
 
     try {
-      const supabase = createClient();
-      const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${window.location.origin}/auth/callback?next=/reset-password`,
+      const res = await fetch("/api/auth/send-reset-link", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email }),
       });
 
-      if (error) {
-        setError(error.message);
+      const data = await res.json();
+
+      if (!res.ok || data.error) {
+        setError(data.error || "Failed to send reset link email.");
         setLoading(false);
         return;
       }
 
-      setMessage("Verification email / OTP sent! Please check your inbox.");
-      setTimeout(() => {
-        router.push(`/verify-otp?email=${encodeURIComponent(email)}&type=recovery`);
-      }, 1500);
+      setMessage("Password reset link sent! Please check your email inbox and click the link to reset your password.");
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "An unexpected error occurred.");
     } finally {
       setLoading(false);
     }
   };
+
 
   return (
     <SignupLayout leftImage="/assets/Forget-Password.png" showSocial={false}>

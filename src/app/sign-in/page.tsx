@@ -6,6 +6,13 @@ import { useState, useEffect, FormEvent } from "react";
 import { SignupLayout } from "@/components/signup/SignupLayout";
 import { createClient } from "@/lib/supabase/client";
 
+/**
+ * LEARNING OBJECTIVE MAPPING:
+ * - [Frontend Authentication Flow]: Client-side login form state management, validation, and session redirection.
+ * - [Authentication]: `supabase.auth.signInWithPassword` authenticates email and password credentials.
+ * - [Protected Routes]: Redirects authenticated users to protected onboarding page (`/upload-resume`).
+ */
+
 export default function SignInPage() {
   const router = useRouter();
   const [email, setEmail] = useState("");
@@ -17,12 +24,14 @@ export default function SignInPage() {
   useEffect(() => {
     if (isVerified) {
       const timer = setTimeout(() => {
-        router.push("/upload-resume"); // Routing to the next step
+        // [Protected Routes] Navigate user into protected application page after successful authentication
+        router.push("/upload-resume");
       }, 2000);
       return () => clearTimeout(timer);
     }
   }, [isVerified, router]);
 
+  // [Frontend Authentication Flow] Handle credential submission
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setError(null);
@@ -36,6 +45,7 @@ export default function SignInPage() {
 
     try {
       const supabase = createClient();
+      // [Authentication] Verify user credentials against Supabase Auth service
       const { error } = await supabase.auth.signInWithPassword({
         email,
         password,
@@ -54,6 +64,7 @@ export default function SignInPage() {
       setLoading(false);
     }
   };
+
 
   if (isVerified) {
     return (

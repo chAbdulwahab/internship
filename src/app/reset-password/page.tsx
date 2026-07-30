@@ -5,6 +5,13 @@ import { useRouter } from "next/navigation";
 import { SignupLayout } from "@/components/signup/SignupLayout";
 import { createClient } from "@/lib/supabase/client";
 
+/**
+ * LEARNING OBJECTIVE MAPPING:
+ * - [Password Reset]: Final step of recovery flow updating password via `supabase.auth.updateUser`.
+ * - [Password Hashing]: Updated password is encrypted/hashed server-side using bcrypt before persisting.
+ * - [Frontend Authentication Flow]: Password validation and redirecting back to `/sign-in`.
+ */
+
 export default function ResetPasswordPage() {
   const router = useRouter();
   const [password, setPassword] = useState("");
@@ -13,6 +20,7 @@ export default function ResetPasswordPage() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
+  // [Password Reset] Save new password submission
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setError(null);
@@ -36,6 +44,7 @@ export default function ResetPasswordPage() {
 
     try {
       const supabase = createClient();
+      // [Password Reset] & [Password Hashing]: Updates current authenticated user password
       const { error } = await supabase.auth.updateUser({
         password,
       });
@@ -56,6 +65,7 @@ export default function ResetPasswordPage() {
       setLoading(false);
     }
   };
+
 
   return (
     <SignupLayout>
